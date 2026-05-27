@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Networking</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #05080f;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+
+  .canvas { max-width: 1200px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header { text-align: center; margin-bottom: 60px; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: #06b6d4;
+    background: rgba(6,182,212,.1);
+    border: 1px solid rgba(6,182,212,.25);
+    border-radius: 20px;
+    padding: 5px 14px; margin-bottom: 18px;
+  }
+  .header h1 {
+    font-size: clamp(30px, 5vw, 50px);
+    font-weight: 900; line-height: 1.1; letter-spacing: -1px;
+  }
+  .header h1 span { color: #06b6d4; }
+  .header p {
+    margin-top: 14px; font-size: 16px;
+    color: #94a3b8; max-width: 620px;
+    margin-left: auto; margin-right: auto; line-height: 1.6;
+  }
+
+  /* ── Section titles ── */
+  .sec-title {
+    font-size: 20px; font-weight: 800; margin-bottom: 6px;
+  }
+  .sec-sub {
+    font-size: 13px; color: #64748b; margin-bottom: 24px; line-height: 1.5;
+  }
+
+  /* ── Fundamental Networking Model ── */
+  .fundamentals {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+  .fund-card {
+    background: linear-gradient(160deg, #0d1424 0%, #111827 100%);
+    border: 1px solid rgba(6,182,212,.15);
+    border-radius: 16px;
+    padding: 22px 20px;
+  }
+  .fund-num {
+    font-size: 36px; font-weight: 900;
+    font-family: 'JetBrains Mono', monospace;
+    color: rgba(6,182,212,.2);
+    margin-bottom: 4px;
+    line-height: 1;
+  }
+  .fund-title { font-size: 14px; font-weight: 700; color: #06b6d4; margin-bottom: 8px; }
+  .fund-desc { font-size: 12px; color: #94a3b8; line-height: 1.6; }
+
+  /* ── Pod Networking Diagram ── */
+  .pod-network-section {
+    background: linear-gradient(135deg, #0d1424 0%, #111827 100%);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 24px;
+    padding: 36px;
+    margin-bottom: 48px;
+  }
+
+  .node-diagram {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 0;
+    align-items: center;
+    margin-top: 28px;
+  }
+
+  .node-box {
+    background: rgba(0,0,0,.3);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 18px;
+    padding: 24px;
+  }
+  .node-box-title {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: #475569; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .node-box-title-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #10b981;
+    box-shadow: 0 0 4px #10b981;
+  }
+
+  .pod-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .pod-item-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .pod-item-info { flex: 1; }
+  .pod-item-name { font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .pod-item-ip { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .pod-item-port {
+    font-size: 10px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,.06);
+    color: #94a3b8;
+  }
+
+  .veth-label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: #334155; text-align: center;
+    margin: 12px 0 6px;
+  }
+  .bridge-bar {
+    height: 6px; border-radius: 4px;
+    background: linear-gradient(90deg, #0891b2, #06b6d4);
+    margin-bottom: 6px;
+    position: relative;
+  }
+  .bridge-label {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    color: #0891b2; text-align: center;
+  }
+
+  .node-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .connector-label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: #334155; text-align: center;
+  }
+  .connector-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+  }
+  .c-line {
+    flex: 1; height: 2px;
+    background: linear-gradient(90deg, #0891b2, #06b6d4, #0891b2);
+    border-radius: 2px;
+  }
+  .overlay-box {
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(8,145,178,.1);
+    border: 1px solid rgba(6,182,212,.2);
+    font-size: 10px; font-weight: 700;
+    color: #22d3ee; text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Service Types ── */
+  .services-section { margin-bottom: 48px; }
+  .service-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+  }
+  .svc-card {
+    border-radius: 18px;
+    overflow: hidden;
+    position: relative;
+  }
+  .svc-card-inner { padding: 24px 22px; }
+
+  .svc-clusterip { background: linear-gradient(160deg, #0f1629, #111827); border: 1px solid rgba(99,102,241,.2); }
+  .svc-nodeport  { background: linear-gradient(160deg, #0a1f1f, #111827); border: 1px solid rgba(16,185,129,.2); }
+  .svc-lb        { background: linear-gradient(160deg, #1a1030, #111827); border: 1px solid rgba(168,85,247,.2); }
+  .svc-headless  { background: linear-gradient(160deg, #1a1010, #111827); border: 1px solid rgba(239,68,68,.2); }
+
+  .svc-type-badge {
+    display: inline-block;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    border-radius: 6px; padding: 3px 10px;
+    margin-bottom: 14px;
+    border: 1px solid;
+  }
+  .svc-icon {
+    width: 44px; height: 44px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px;
+  }
+  .svc-name { font-size: 16px; font-weight: 800; margin-bottom: 6px; }
+  .svc-desc { font-size: 12px; color: #94a3b8; line-height: 1.55; margin-bottom: 16px; }
+  .svc-use-label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: #475569; margin-bottom: 8px;
+  }
+  .svc-use { font-size: 12px; color: #64748b; line-height: 1.5; }
+  .svc-diagram {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(0,0,0,.2);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #64748b;
+    line-height: 1.8;
+  }
+
+  /* ── Ingress ── */
+  .ingress-section {
+    background: linear-gradient(135deg, #0d1424, #111827);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 24px;
+    padding: 36px;
+    margin-bottom: 48px;
+  }
+
+  .ingress-flow {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr 60px 1fr 60px 1fr;
+    gap: 0;
+    align-items: center;
+    margin-top: 28px;
+  }
+  .ing-step {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    padding: 18px 16px;
+    text-align: center;
+  }
+  .ing-step-icon {
+    width: 42px; height: 42px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 10px;
+  }
+  .ing-step-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .ing-step-desc { font-size: 10px; color: #64748b; line-height: 1.4; }
+  .ing-arrow {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+    font-size: 9px; color: #334155;
+    font-weight: 700; letter-spacing: 1px;
+  }
+
+  .ingress-rules {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .ingress-rule {
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .ir-path {
+    flex: 1;
+    color: #06b6d4;
+  }
+  .ir-arrow { color: #334155; }
+  .ir-dest { color: #94a3b8; }
+
+  /* ── DNS ── */
+  .dns-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 48px;
+  }
+  .dns-card {
+    background: linear-gradient(135deg, #0d1424, #111827);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 20px;
+    padding: 28px;
+  }
+  .dns-card h3 { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+  .dns-card p { font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+  .dns-record {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(0,0,0,.2);
+    border: 1px solid rgba(255,255,255,.05);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  .dns-record-type {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 5px;
+    flex-shrink: 0;
+  }
+  .dns-record-name { color: #06b6d4; flex: 1; }
+  .dns-record-val { color: #94a3b8; }
+
+  .dns-path {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .dns-path-step {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    border-left: 2px solid rgba(6,182,212,.2);
+    margin-left: 14px;
+    font-size: 12px; color: #94a3b8;
+    line-height: 1.4;
+  }
+  .dns-path-step:first-child { padding-top: 0; }
+  .dns-path-step strong { color: #e2e8f0; display: block; }
+  .dns-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #0891b2;
+    flex-shrink: 0; margin-left: -19px;
+  }
+
+  /* ── Network Policies ── */
+  .netpol-section {
+    background: linear-gradient(135deg, #0d1424, #111827);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 24px;
+    padding: 36px;
+    margin-bottom: 48px;
+  }
+  .netpol-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 28px;
+  }
+  .netpol-panel {
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .netpol-panel h4 { font-size: 14px; font-weight: 800; margin-bottom: 6px; }
+  .netpol-panel p { font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.5; }
+
+  .allow-rule {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 8px;
+    font-size: 11px; margin-bottom: 8px;
+    border: 1px solid;
+  }
+  .allow-rule .rule-icon { flex-shrink: 0; }
+  .rule-src { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  .rule-arrow { color: #334155; margin: 0 6px; }
+  .rule-dst { font-family: 'JetBrains Mono', monospace; color: #94a3b8; }
+
+  /* ── kube-proxy modes ── */
+  .proxy-section {
+    margin-bottom: 48px;
+  }
+  .proxy-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-top: 0;
+  }
+  .proxy-card {
+    background: linear-gradient(160deg, #0d1424, #111827);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 16px;
+    padding: 22px 20px;
+  }
+  .proxy-card .badge {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 6px;
+    margin-bottom: 12px; border: 1px solid;
+  }
+  .proxy-card h4 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+  .proxy-card p { font-size: 12px; color: #94a3b8; line-height: 1.55; margin-bottom: 14px; }
+  .proxy-card .pros { font-size: 11px; color: #64748b; line-height: 1.8; }
+  .proxy-card .pros span { display: block; }
+  .proxy-card .pros span::before { content: '+ '; color: #10b981; }
+  .proxy-card .cons { font-size: 11px; color: #64748b; line-height: 1.8; }
+  .proxy-card .cons span { display: block; }
+  .proxy-card .cons span::before { content: '− '; color: #ef4444; }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    font-size: 12px; color: #334155;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+  .footer span { color: #475569; }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow">Kubernetes Deep Dive</div>
+    <h1>Kubernetes<br><span>Networking</span></h1>
+    <p>Pod networking, Services, Ingress, DNS, Network Policies, and kube-proxy — the complete networking model explained.</p>
+  </div>
+
+  <!-- Fundamental rules -->
+  <div class="sec-title">The Four Fundamental Rules</div>
+  <div class="sec-sub" style="margin-bottom:20px;">Kubernetes mandates these networking requirements — CNI plugins must satisfy all four</div>
+  <div class="fundamentals">
+    <div class="fund-card">
+      <div class="fund-num">01</div>
+      <div class="fund-title">Pod-to-Pod (same node)</div>
+      <div class="fund-desc">Every pod can communicate with every other pod on the same node without NAT via a shared Linux bridge or veth pair.</div>
+    </div>
+    <div class="fund-card">
+      <div class="fund-num">02</div>
+      <div class="fund-title">Pod-to-Pod (across nodes)</div>
+      <div class="fund-desc">Pods on different nodes can communicate directly using their pod IP — no NAT required. Handled by overlay or underlay routing.</div>
+    </div>
+    <div class="fund-card">
+      <div class="fund-num">03</div>
+      <div class="fund-title">Node-to-Pod</div>
+      <div class="fund-desc">Nodes can reach any pod IP directly. Used by kubelet health checks, kube-proxy, and hostNetwork pods.</div>
+    </div>
+    <div class="fund-card">
+      <div class="fund-num">04</div>
+      <div class="fund-title">Unique Pod IPs</div>
+      <div class="fund-desc">Every pod gets its own unique IP address from the cluster CIDR — no port collision between pods running the same image.</div>
+    </div>
+  </div>
+
+  <!-- Pod Networking Diagram -->
+  <div class="pod-network-section">
+    <div class="sec-title">Pod Networking Model</div>
+    <div class="sec-sub">How packets travel from one pod to another — within and across nodes</div>
+
+    <div class="node-diagram">
+      <!-- Node A -->
+      <div class="node-box">
+        <div class="node-box-title">
+          <div class="node-box-title-dot"></div>
+          Node A · 192.168.1.10
+        </div>
+
+        <div class="pod-item" style="background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.15);">
+          <div class="pod-item-icon" style="background:rgba(6,182,212,.12);">📦</div>
+          <div class="pod-item-info">
+            <div class="pod-item-name" style="color:#22d3ee;">pod-frontend</div>
+            <div class="pod-item-ip">10.244.1.5</div>
+          </div>
+          <div class="pod-item-port">:3000</div>
+        </div>
+
+        <div class="pod-item" style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);">
+          <div class="pod-item-icon" style="background:rgba(16,185,129,.12);">📦</div>
+          <div class="pod-item-info">
+            <div class="pod-item-name" style="color:#34d399;">pod-cache</div>
+            <div class="pod-item-ip">10.244.1.6</div>
+          </div>
+          <div class="pod-item-port">:6379</div>
+        </div>
+
+        <div class="veth-label">↕ veth pairs</div>
+        <div class="bridge-bar"></div>
+        <div class="bridge-label">cbr0 / cni0 bridge · 10.244.1.1</div>
+      </div>
+
+      <!-- Connector -->
+      <div class="node-connector">
+        <div class="connector-label" style="margin-bottom:4px;">Overlay</div>
+        <div class="overlay-box">VXLAN<br>IPIP<br>BGP</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:0 8px;">
+          <div style="width:100%;height:2px;background:linear-gradient(90deg,transparent,#0891b2,transparent);border-radius:2px;"></div>
+          <div style="font-size:8px;color:#334155;font-weight:700;letter-spacing:1px;text-transform:uppercase;">eth0 ↔ eth0</div>
+          <div style="width:100%;height:2px;background:linear-gradient(90deg,transparent,#0891b2,transparent);border-radius:2px;"></div>
+        </div>
+        <div class="connector-label">Underlay</div>
+      </div>
+
+      <!-- Node B -->
+      <div class="node-box">
+        <div class="node-box-title">
+          <div class="node-box-title-dot"></div>
+          Node B · 192.168.1.11
+        </div>
+
+        <div class="pod-item" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);">
+          <div class="pod-item-icon" style="background:rgba(245,158,11,.12);">📦</div>
+          <div class="pod-item-info">
+            <div class="pod-item-name" style="color:#fbbf24;">pod-api</div>
+            <div class="pod-item-ip">10.244.2.3</div>
+          </div>
+          <div class="pod-item-port">:8080</div>
+        </div>
+
+        <div class="pod-item" style="background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.15);">
+          <div class="pod-item-icon" style="background:rgba(139,92,246,.12);">📦</div>
+          <div class="pod-item-info">
+            <div class="pod-item-name" style="color:#a78bfa;">pod-worker</div>
+            <div class="pod-item-ip">10.244.2.4</div>
+          </div>
+          <div class="pod-item-port">:9000</div>
+        </div>
+
+        <div class="veth-label">↕ veth pairs</div>
+        <div class="bridge-bar"></div>
+        <div class="bridge-label">cbr0 / cni0 bridge · 10.244.2.1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service Types -->
+  <div class="services-section">
+    <div class="sec-title">Service Types</div>
+    <div class="sec-sub">Services provide stable virtual IPs and DNS names that load-balance across pod replicas</div>
+    <div class="service-cards">
+
+      <!-- ClusterIP -->
+      <div class="svc-card svc-clusterip">
+        <div class="svc-card-inner">
+          <div class="svc-type-badge" style="background:rgba(99,102,241,.1);color:#818cf8;border-color:rgba(99,102,241,.3);">Default</div>
+          <div class="svc-icon" style="background:rgba(99,102,241,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2">
+              <circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="9"/>
+            </svg>
+          </div>
+          <div class="svc-name" style="color:#818cf8;">ClusterIP</div>
+          <div class="svc-desc">Creates a virtual IP reachable only inside the cluster. kube-proxy programs iptables/IPVS rules to load-balance to pod endpoints.</div>
+          <div class="svc-use-label">Use for</div>
+          <div class="svc-use">Internal service-to-service communication. Frontend → Backend API calls.</div>
+          <div class="svc-diagram">
+            Client Pod<br>
+            → ClusterIP 10.96.0.1:80<br>
+            → iptables DNAT<br>
+            → Pod 10.244.x.x:8080
+          </div>
+        </div>
+      </div>
+
+      <!-- NodePort -->
+      <div class="svc-card svc-nodeport">
+        <div class="svc-card-inner">
+          <div class="svc-type-badge" style="background:rgba(16,185,129,.1);color:#34d399;border-color:rgba(16,185,129,.3);">External</div>
+          <div class="svc-icon" style="background:rgba(16,185,129,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <path d="M12 17v4M8 21h8"/>
+              <path d="M7 8h4M7 12h4M15 8l2 4-2 4"/>
+            </svg>
+          </div>
+          <div class="svc-name" style="color:#34d399;">NodePort</div>
+          <div class="svc-desc">Opens a static port (30000–32767) on every node's IP. External traffic hitting any node on that port is forwarded to the service.</div>
+          <div class="svc-use-label">Use for</div>
+          <div class="svc-use">Dev/test external access. Simple external exposure without a cloud LB.</div>
+          <div class="svc-diagram">
+            Internet<br>
+            → NodeIP:30080<br>
+            → ClusterIP:80<br>
+            → Pod:8080
+          </div>
+        </div>
+      </div>
+
+      <!-- LoadBalancer -->
+      <div class="svc-card svc-lb">
+        <div class="svc-card-inner">
+          <div class="svc-type-badge" style="background:rgba(168,85,247,.1);color:#c084fc;border-color:rgba(168,85,247,.3);">Cloud</div>
+          <div class="svc-icon" style="background:rgba(168,85,247,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div class="svc-name" style="color:#c084fc;">LoadBalancer</div>
+          <div class="svc-desc">Provisions an external cloud load balancer (AWS ALB, GCP CLB, Azure LB) with a public IP that routes to NodePort, then to pods.</div>
+          <div class="svc-use-label">Use for</div>
+          <div class="svc-use">Production external access on managed Kubernetes (EKS, GKE, AKS).</div>
+          <div class="svc-diagram">
+            Internet<br>
+            → Cloud LB (203.x.x.1:80)<br>
+            → NodePort:30080<br>
+            → Pod:8080
+          </div>
+        </div>
+      </div>
+
+      <!-- Headless -->
+      <div class="svc-card svc-headless">
+        <div class="svc-card-inner">
+          <div class="svc-type-badge" style="background:rgba(239,68,68,.1);color:#f87171;border-color:rgba(239,68,68,.3);">Special</div>
+          <div class="svc-icon" style="background:rgba(239,68,68,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <div class="svc-name" style="color:#f87171;">Headless</div>
+          <div class="svc-desc">No cluster IP assigned (clusterIP: None). DNS returns individual pod IPs directly, enabling direct pod addressing for stateful apps.</div>
+          <div class="svc-use-label">Use for</div>
+          <div class="svc-use">StatefulSets (Kafka, Cassandra, etcd). Client-side load balancing.</div>
+          <div class="svc-diagram">
+            DNS: my-svc<br>
+            → A: 10.244.1.5<br>
+            → A: 10.244.1.6<br>
+            → A: 10.244.1.7
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Ingress -->
+  <div class="ingress-section">
+    <div class="sec-title">Ingress — HTTP/HTTPS Routing</div>
+    <div class="sec-sub">Ingress exposes HTTP routes from outside the cluster to Services — host-based and path-based routing at L7</div>
+
+    <div class="ingress-flow">
+      <div class="ing-step">
+        <div class="ing-step-icon" style="background:rgba(6,182,212,.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>
+        </div>
+        <div class="ing-step-name" style="color:#22d3ee;">Internet</div>
+        <div class="ing-step-desc">HTTPS request from a client browser</div>
+      </div>
+      <div class="ing-arrow">
+        <svg width="36" height="12" viewBox="0 0 36 12" fill="none"><line x1="0" y1="6" x2="30" y2="6" stroke="#334155" stroke-width="2"/><path d="M26 2l6 4-6 4" stroke="#334155" stroke-width="2" fill="none"/></svg>
+        <div style="font-size:9px;color:#334155;">:443</div>
+      </div>
+      <div class="ing-step">
+        <div class="ing-step-icon" style="background:rgba(245,158,11,.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="ing-step-name" style="color:#f59e0b;">Ingress<br>Controller</div>
+        <div class="ing-step-desc">nginx, Traefik, Kong, Envoy…</div>
+      </div>
+      <div class="ing-arrow">
+        <svg width="36" height="12" viewBox="0 0 36 12" fill="none"><line x1="0" y1="6" x2="30" y2="6" stroke="#334155" stroke-width="2"/><path d="M26 2l6 4-6 4" stroke="#334155" stroke-width="2" fill="none"/></svg>
+        <div style="font-size:9px;color:#334155;">route</div>
+      </div>
+      <div class="ing-step">
+        <div class="ing-step-icon" style="background:rgba(99,102,241,.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <div class="ing-step-name" style="color:#818cf8;">ClusterIP<br>Service</div>
+        <div class="ing-step-desc">Virtual IP load-balances to pods</div>
+      </div>
+      <div class="ing-arrow">
+        <svg width="36" height="12" viewBox="0 0 36 12" fill="none"><line x1="0" y1="6" x2="30" y2="6" stroke="#334155" stroke-width="2"/><path d="M26 2l6 4-6 4" stroke="#334155" stroke-width="2" fill="none"/></svg>
+        <div style="font-size:9px;color:#334155;">DNAT</div>
+      </div>
+      <div class="ing-step">
+        <div class="ing-step-icon" style="background:rgba(16,185,129,.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><rect x="2" y="8" width="20" height="14" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        </div>
+        <div class="ing-step-name" style="color:#34d399;">Backend<br>Pods</div>
+        <div class="ing-step-desc">Application containers</div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#475569;margin-bottom:12px;">Routing Rules Example</div>
+      <div class="ingress-rules">
+        <div class="ingress-rule">
+          <div class="ir-path">api.example.com/v1/*</div>
+          <div class="ir-arrow">→</div>
+          <div class="ir-dest">api-service:8080</div>
+        </div>
+        <div class="ingress-rule">
+          <div class="ir-path">api.example.com/v2/*</div>
+          <div class="ir-arrow">→</div>
+          <div class="ir-dest">api-v2-service:8080</div>
+        </div>
+        <div class="ingress-rule">
+          <div class="ir-path">app.example.com/*</div>
+          <div class="ir-arrow">→</div>
+          <div class="ir-dest">frontend-service:3000</div>
+        </div>
+        <div class="ingress-rule">
+          <div class="ir-path">static.example.com/*</div>
+          <div class="ir-arrow">→</div>
+          <div class="ir-dest">cdn-service:80</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DNS -->
+  <div class="dns-section">
+    <div class="dns-card">
+      <h3>CoreDNS — Cluster DNS</h3>
+      <p>CoreDNS runs as a Deployment and provides DNS resolution for all Services and Pods within the cluster. Every pod's <code style="font-family:monospace;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:3px;">/etc/resolv.conf</code> points to it.</p>
+
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#475569;margin-bottom:10px;">DNS Records for Services</div>
+      <div class="dns-record">
+        <span class="dns-record-type" style="background:rgba(6,182,212,.12);color:#22d3ee;border:1px solid rgba(6,182,212,.3);">A</span>
+        <span class="dns-record-name">my-svc.my-ns.svc.cluster.local</span>
+        <span class="dns-record-val">→ 10.96.0.1</span>
+      </div>
+      <div class="dns-record">
+        <span class="dns-record-type" style="background:rgba(99,102,241,.12);color:#818cf8;border:1px solid rgba(99,102,241,.3);">SRV</span>
+        <span class="dns-record-name">_http._tcp.my-svc.my-ns</span>
+        <span class="dns-record-val">→ port 80</span>
+      </div>
+      <div class="dns-record">
+        <span class="dns-record-type" style="background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3);">PTR</span>
+        <span class="dns-record-name">1.0.96.10.in-addr.arpa</span>
+        <span class="dns-record-val">→ my-svc.my-ns</span>
+      </div>
+      <div style="height:16px;"></div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#475569;margin-bottom:10px;">DNS Records for Pods</div>
+      <div class="dns-record">
+        <span class="dns-record-type" style="background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3);">A</span>
+        <span class="dns-record-name">10-244-1-5.my-ns.pod.cluster.local</span>
+        <span class="dns-record-val">→ 10.244.1.5</span>
+      </div>
+    </div>
+
+    <div class="dns-card">
+      <h3>DNS Resolution Path</h3>
+      <p>How a pod resolves <code style="font-family:monospace;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:3px;">mysql.production.svc.cluster.local</code></p>
+
+      <div class="dns-path">
+        <div class="dns-path-step" style="padding-top:4px;">
+          <div class="dns-dot"></div>
+          <div>
+            <strong>App makes DNS query</strong>
+            Resolver reads /etc/resolv.conf · search domain: cluster.local
+          </div>
+        </div>
+        <div class="dns-path-step">
+          <div class="dns-dot"></div>
+          <div>
+            <strong>Query sent to CoreDNS ClusterIP</strong>
+            kube-dns Service IP: 10.96.0.10:53 (UDP)
+          </div>
+        </div>
+        <div class="dns-path-step">
+          <div class="dns-dot"></div>
+          <div>
+            <strong>CoreDNS looks up Service</strong>
+            Reads from API server cache — finds mysql in production namespace
+          </div>
+        </div>
+        <div class="dns-path-step">
+          <div class="dns-dot"></div>
+          <div>
+            <strong>Returns ClusterIP</strong>
+            A record: 10.96.14.23 — app connects to stable virtual IP
+          </div>
+        </div>
+        <div class="dns-path-step">
+          <div class="dns-dot" style="background:#10b981;"></div>
+          <div>
+            <strong>kube-proxy routes to pod</strong>
+            iptables/IPVS DNAT rewrites destination to a healthy pod IP
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Network Policies -->
+  <div class="netpol-section">
+    <div class="sec-title">Network Policies</div>
+    <div class="sec-sub">Firewall rules for pods — by default all pod-to-pod traffic is allowed; NetworkPolicy objects add restrictions</div>
+
+    <div class="netpol-grid">
+      <div class="netpol-panel" style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.15);">
+        <h4 style="color:#34d399;">✅ Allow Rules</h4>
+        <p>These flows are explicitly permitted in the policy below</p>
+        <div class="allow-rule" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);">
+          <span class="rule-icon">🌐</span>
+          <span class="rule-src" style="color:#34d399;">internet</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">frontend:3000</span>
+        </div>
+        <div class="allow-rule" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);">
+          <span class="rule-icon">📦</span>
+          <span class="rule-src" style="color:#34d399;">frontend</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">api:8080</span>
+        </div>
+        <div class="allow-rule" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);">
+          <span class="rule-icon">📦</span>
+          <span class="rule-src" style="color:#34d399;">api</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">mysql:3306</span>
+        </div>
+        <div class="allow-rule" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);">
+          <span class="rule-icon">📦</span>
+          <span class="rule-src" style="color:#34d399;">api</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">redis:6379</span>
+        </div>
+      </div>
+
+      <div class="netpol-panel" style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);">
+        <h4 style="color:#f87171;">🚫 Deny Rules (implicit)</h4>
+        <p>Any flow not matching an ingress/egress selector is dropped</p>
+        <div class="allow-rule" style="background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);">
+          <span class="rule-icon">🌐</span>
+          <span class="rule-src" style="color:#f87171;">internet</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">mysql:3306</span>
+        </div>
+        <div class="allow-rule" style="background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);">
+          <span class="rule-icon">📦</span>
+          <span class="rule-src" style="color:#f87171;">frontend</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">mysql:3306</span>
+        </div>
+        <div class="allow-rule" style="background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);">
+          <span class="rule-icon">📦</span>
+          <span class="rule-src" style="color:#f87171;">api</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">etcd:2379</span>
+        </div>
+        <div class="allow-rule" style="background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);">
+          <span class="rule-icon">📦</span>
+          <span class="rule-src" style="color:#f87171;">random-pod</span>
+          <span class="rule-arrow">→</span>
+          <span class="rule-dst">api:8080</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- kube-proxy modes -->
+  <div class="proxy-section">
+    <div class="sec-title">kube-proxy Modes</div>
+    <div class="sec-sub" style="margin-bottom:22px;">kube-proxy watches Services and Endpoints; programs rules on each node to forward Service VIP traffic to healthy pods</div>
+    <div class="proxy-grid">
+      <div class="proxy-card">
+        <div class="badge" style="background:rgba(239,68,68,.1);color:#f87171;border-color:rgba(239,68,68,.2);">Legacy</div>
+        <h4 style="color:#f87171;">userspace</h4>
+        <p>Traffic goes through a Go proxy process in userspace — slow due to kernel/userspace context switches. Deprecated.</p>
+        <div class="cons">
+          <span>High latency</span>
+          <span>Bottleneck at proxy process</span>
+          <span>Not used in modern clusters</span>
+        </div>
+      </div>
+      <div class="proxy-card">
+        <div class="badge" style="background:rgba(245,158,11,.1);color:#fbbf24;border-color:rgba(245,158,11,.2);">Default</div>
+        <h4 style="color:#fbbf24;">iptables</h4>
+        <p>Programs iptables DNAT rules in the kernel. No userspace hops — random pod selection per connection. Default in most distros.</p>
+        <div class="pros" style="margin-bottom:8px;">
+          <span>Kernel-speed forwarding</span>
+          <span>No proxy process overhead</span>
+        </div>
+        <div class="cons">
+          <span>O(n) rule lookup at scale</span>
+          <span>Random LB only (no least-conn)</span>
+        </div>
+      </div>
+      <div class="proxy-card">
+        <div class="badge" style="background:rgba(16,185,129,.1);color:#34d399;border-color:rgba(16,185,129,.2);">Recommended</div>
+        <h4 style="color:#34d399;">IPVS</h4>
+        <p>Uses Linux IPVS (IP Virtual Server) with a hash table for O(1) rule lookup. Supports multiple load-balancing algorithms.</p>
+        <div class="pros">
+          <span>O(1) lookup regardless of scale</span>
+          <span>Round-robin, least-conn, SH, DH</span>
+          <span>Better throughput at 1000+ Services</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Kubernetes</span> · Networking Architecture · <span>Pod IPs, Services, Ingress, DNS, NetworkPolicy &amp; kube-proxy</span>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Interfaces: CNI · CRI · CSI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+
+  .canvas {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .header .eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #326ce5;
+    background: rgba(50,108,229,.12);
+    border: 1px solid rgba(50,108,229,.3);
+    border-radius: 20px;
+    padding: 5px 14px;
+    margin-bottom: 18px;
+  }
+  .header h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -1px;
+  }
+  .header h1 span { color: #326ce5; }
+  .header p {
+    margin-top: 14px;
+    font-size: 17px;
+    color: #94a3b8;
+    max-width: 620px;
+    margin-left: auto; margin-right: auto;
+    line-height: 1.6;
+  }
+
+  /* ── Architecture diagram ── */
+  .arch-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr 80px 1fr;
+    gap: 0;
+    margin-bottom: 56px;
+    align-items: center;
+  }
+
+  .k8s-layer {
+    background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+  }
+  .k8s-layer .layer-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-radius: 6px;
+    padding: 3px 10px;
+    margin-bottom: 10px;
+  }
+  .k8s-layer .layer-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .k8s-layer .layer-sub {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .arrow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+  .arrow-col svg { opacity: .5; }
+
+  /* ── Interface Cards ── */
+  .interfaces-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    margin-bottom: 56px;
+  }
+
+  .iface-card {
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+  .iface-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    padding: 1px;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* CNI - blue */
+  .iface-cni { background: linear-gradient(160deg, #0f1a35 0%, #111827 100%); }
+  .iface-cni::before { background: linear-gradient(135deg, #326ce5, #1d4ed8); }
+  .iface-cni .accent { color: #60a5fa; }
+  .iface-cni .accent-bg { background: rgba(50,108,229,.12); }
+  .iface-cni .tag { background: rgba(50,108,229,.15); color: #60a5fa; border-color: rgba(50,108,229,.3); }
+  .iface-cni .badge { background: #326ce5; }
+
+  /* CRI - purple */
+  .iface-cri { background: linear-gradient(160deg, #1a0f35 0%, #1e1128 100%); }
+  .iface-cri::before { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+  .iface-cri .accent { color: #c084fc; }
+  .iface-cri .accent-bg { background: rgba(124,58,237,.12); }
+  .iface-cri .tag { background: rgba(124,58,237,.15); color: #c084fc; border-color: rgba(124,58,237,.3); }
+  .iface-cri .badge { background: #7c3aed; }
+
+  /* CSI - teal */
+  .iface-csi { background: linear-gradient(160deg, #0a1f1f 0%, #0d2323 100%); }
+  .iface-csi::before { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+  .iface-csi .accent { color: #2dd4bf; }
+  .iface-csi .accent-bg { background: rgba(13,148,136,.12); }
+  .iface-csi .tag { background: rgba(13,148,136,.15); color: #2dd4bf; border-color: rgba(13,148,136,.3); }
+  .iface-csi .badge { background: #0d9488; }
+
+  .iface-card-inner { padding: 28px; }
+
+  .iface-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  .iface-icon-wrap {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .iface-acronym {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 2px;
+    opacity: .7;
+    margin-bottom: 2px;
+  }
+  .iface-name {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+  .iface-tagline {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  .iface-desc {
+    font-size: 14px;
+    color: #94a3b8;
+    line-height: 1.65;
+    margin-bottom: 22px;
+  }
+
+  .plugins-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 10px;
+  }
+  .plugin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+  .plugin-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .plugin-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.05);
+  }
+  .step-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .step-text {
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+
+  /* ── How Kubernetes uses them ── */
+  .kubelet-section {
+    background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 20px;
+    padding: 36px;
+    margin-bottom: 56px;
+  }
+  .kubelet-section h2 {
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .kubelet-section p.sub {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 32px;
+  }
+  .kubelet-diagram {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 40px;
+    align-items: center;
+  }
+  .kubelet-box {
+    background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+    border-radius: 16px;
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .kubelet-box .kb-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.6);
+    margin-bottom: 6px;
+  }
+  .kubelet-box .kb-name {
+    font-size: 22px;
+    font-weight: 900;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .kubelet-box .kb-sub {
+    font-size: 11px;
+    color: rgba(255,255,255,.5);
+    margin-top: 4px;
+  }
+  .kubelet-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .kubelet-arrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .ka-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    width: 36px;
+    flex-shrink: 0;
+  }
+  .ka-line {
+    flex: 1;
+    height: 2px;
+    border-radius: 2px;
+    position: relative;
+  }
+  .ka-line::after {
+    content: '';
+    position: absolute;
+    right: -1px; top: 50%;
+    transform: translateY(-50%);
+    width: 0; height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .ka-cni .ka-line { background: #326ce5; }
+  .ka-cni .ka-line::after { border-left: 8px solid #326ce5; }
+  .ka-cri .ka-line { background: #7c3aed; }
+  .ka-cri .ka-line::after { border-left: 8px solid #7c3aed; }
+  .ka-csi .ka-line { background: #0d9488; }
+  .ka-csi .ka-line::after { border-left: 8px solid #0d9488; }
+
+  .ka-dest {
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    width: 160px;
+    text-align: center;
+  }
+
+  /* ── Comparison Table ── */
+  .compare-section { margin-bottom: 56px; }
+  .compare-section h2 {
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: linear-gradient(135deg, #111827, #1e293b);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 16px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  .compare-table th {
+    padding: 14px 18px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #64748b;
+    background: rgba(0,0,0,.2);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .compare-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    line-height: 1.5;
+    vertical-align: middle;
+  }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table td:first-child {
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+  }
+  .td-cni { color: #60a5fa; }
+  .td-cri { color: #c084fc; }
+  .td-csi { color: #2dd4bf; }
+
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    font-size: 12px;
+    color: #334155;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+  .footer span { color: #475569; }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow">Kubernetes Architecture</div>
+    <h1>The Three Pillars of<br><span>Kubernetes Extensibility</span></h1>
+    <p>CNI, CRI, and CSI are standardised plugin interfaces that decouple Kubernetes from specific networking, runtime, and storage implementations.</p>
+  </div>
+
+  <!-- Architecture overview -->
+  <div class="arch-row">
+    <div class="k8s-layer">
+      <div class="layer-badge" style="background:rgba(50,108,229,.15);color:#60a5fa;border:1px solid rgba(50,108,229,.3);">CNI</div>
+      <div class="layer-title" style="color:#60a5fa;">Network</div>
+      <div class="layer-sub">IP allocation, routing,<br>network policies</div>
+    </div>
+    <div class="arrow-col">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </div>
+    <div class="k8s-layer" style="border-color:rgba(50,108,229,.25);background:linear-gradient(135deg,#1e2d4e,#1e293b);">
+      <div class="layer-badge" style="background:rgba(50,108,229,.2);color:#93c5fd;border:1px solid rgba(50,108,229,.4);">kubelet</div>
+      <div class="layer-title">Kubernetes Node Agent</div>
+      <div class="layer-sub">Orchestrates pod lifecycle<br>via plugin interfaces</div>
+    </div>
+    <div class="arrow-col">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </div>
+    <div class="k8s-layer">
+      <div class="layer-badge" style="background:rgba(124,58,237,.15);color:#c084fc;border:1px solid rgba(124,58,237,.3);">CRI</div>
+      <div class="layer-title" style="color:#c084fc;">Container Runtime</div>
+      <div class="layer-sub">Image pull, container<br>create/start/stop</div>
+    </div>
+  </div>
+
+  <!-- CSI row -->
+  <div style="display:flex;justify-content:center;margin-bottom:40px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;max-width:320px;width:100%;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#64748b;font-weight:700;letter-spacing:1px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        Storage interface
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      </div>
+      <div class="k8s-layer" style="width:100%;border-color:rgba(13,148,136,.25);">
+        <div class="layer-badge" style="background:rgba(13,148,136,.15);color:#2dd4bf;border:1px solid rgba(13,148,136,.3);">CSI</div>
+        <div class="layer-title" style="color:#2dd4bf;">Storage</div>
+        <div class="layer-sub">Volume provisioning, attach,<br>mount, snapshots</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interface Cards -->
+  <div class="interfaces-grid">
+
+    <!-- CNI Card -->
+    <div class="iface-card iface-cni">
+      <div class="iface-card-inner">
+        <div class="iface-header">
+          <div class="iface-icon-wrap accent-bg">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M3 12h3M18 12h3M12 3v3M12 18v3"/>
+              <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>
+            </svg>
+          </div>
+          <div>
+            <div class="iface-acronym accent">CNI</div>
+            <div class="iface-name">Container Network Interface</div>
+            <div class="iface-tagline">Defines how pods get network connectivity</div>
+          </div>
+        </div>
+
+        <div class="iface-desc">
+          CNI is a specification and set of libraries for configuring network interfaces in Linux containers. When a pod is created, kubelet calls the CNI plugin to assign an IP address and set up routing rules.
+        </div>
+
+        <div class="plugins-label">Popular Plugins</div>
+        <div class="plugin-grid">
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#60a5fa;"></div>Calico
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#60a5fa;"></div>Flannel
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#60a5fa;"></div>Cilium
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#60a5fa;"></div>Weave
+          </div>
+        </div>
+
+        <div class="plugins-label">What CNI does</div>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(50,108,229,.2);color:#60a5fa;">1</div>
+            <div class="step-text">Assigns a unique IP address to each pod from the cluster CIDR</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(50,108,229,.2);color:#60a5fa;">2</div>
+            <div class="step-text">Creates virtual network interfaces (veth pairs) in pod namespaces</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(50,108,229,.2);color:#60a5fa;">3</div>
+            <div class="step-text">Configures routes so pods can communicate across nodes</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(50,108,229,.2);color:#60a5fa;">4</div>
+            <div class="step-text">Enforces NetworkPolicy rules via eBPF or iptables</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CRI Card -->
+    <div class="iface-card iface-cri">
+      <div class="iface-card-inner">
+        <div class="iface-header">
+          <div class="iface-icon-wrap accent-bg">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <path d="M8 21h8M12 17v4"/>
+              <path d="M7 8l3 3-3 3"/>
+              <path d="M13 14h4"/>
+            </svg>
+          </div>
+          <div>
+            <div class="iface-acronym accent">CRI</div>
+            <div class="iface-name">Container Runtime Interface</div>
+            <div class="iface-tagline">Abstracts the container runtime layer</div>
+          </div>
+        </div>
+
+        <div class="iface-desc">
+          CRI is a plugin interface that enables kubelet to use different container runtimes without recompilation. It uses a gRPC API to manage pod sandboxes and container lifecycles.
+        </div>
+
+        <div class="plugins-label">Supported Runtimes</div>
+        <div class="plugin-grid">
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#c084fc;"></div>containerd
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#c084fc;"></div>CRI-O
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#c084fc;"></div>Docker*
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#c084fc;"></div>gVisor
+          </div>
+        </div>
+
+        <div class="plugins-label">CRI gRPC Calls</div>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(124,58,237,.2);color:#c084fc;">1</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">PullImage</strong> — fetch image from registry to local store</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(124,58,237,.2);color:#c084fc;">2</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">RunPodSandbox</strong> — create network/IPC namespaces (pause container)</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(124,58,237,.2);color:#c084fc;">3</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">CreateContainer</strong> — init the container in the sandbox</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(124,58,237,.2);color:#c084fc;">4</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">StartContainer</strong> — begin execution of the container process</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CSI Card -->
+    <div class="iface-card iface-csi">
+      <div class="iface-card-inner">
+        <div class="iface-header">
+          <div class="iface-icon-wrap accent-bg">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2">
+              <ellipse cx="12" cy="6" rx="8" ry="3"/>
+              <path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/>
+              <path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>
+            </svg>
+          </div>
+          <div>
+            <div class="iface-acronym accent">CSI</div>
+            <div class="iface-name">Container Storage Interface</div>
+            <div class="iface-tagline">Standard API for storage provisioning</div>
+          </div>
+        </div>
+
+        <div class="iface-desc">
+          CSI defines a standard interface between container orchestrators and storage systems, allowing storage vendors to develop a single plugin that works across Kubernetes and other orchestrators.
+        </div>
+
+        <div class="plugins-label">Storage Drivers</div>
+        <div class="plugin-grid">
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#2dd4bf;"></div>AWS EBS
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#2dd4bf;"></div>GCE PD
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#2dd4bf;"></div>Azure Disk
+          </div>
+          <div class="plugin-item">
+            <div class="plugin-dot" style="background:#2dd4bf;"></div>Rook/Ceph
+          </div>
+        </div>
+
+        <div class="plugins-label">Volume Lifecycle</div>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(13,148,136,.2);color:#2dd4bf;">1</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">CreateVolume</strong> — provision storage on the backend (PVC → PV)</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(13,148,136,.2);color:#2dd4bf;">2</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">ControllerPublish</strong> — attach volume to the target node</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(13,148,136,.2);color:#2dd4bf;">3</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">NodeStageVolume</strong> — format &amp; mount at a global staging path</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num" style="background:rgba(13,148,136,.2);color:#2dd4bf;">4</div>
+            <div class="step-text"><strong style="color:#e2e8f0;">NodePublishVolume</strong> — bind-mount into pod's container path</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparison Table -->
+  <div class="compare-section">
+    <h2>Side-by-Side Comparison</h2>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Interface</th>
+          <th>Full Name</th>
+          <th>Problem Solved</th>
+          <th>Who calls it</th>
+          <th>Protocol</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="td-cni">CNI</td>
+          <td>Container Network Interface</td>
+          <td>Pod IP assignment &amp; routing</td>
+          <td>kubelet (via CNI binary)</td>
+          <td>Shell exec + JSON</td>
+          <td><span class="pill" style="background:rgba(50,108,229,.12);color:#60a5fa;border-color:rgba(50,108,229,.3);">Stable</span></td>
+        </tr>
+        <tr>
+          <td class="td-cri">CRI</td>
+          <td>Container Runtime Interface</td>
+          <td>Container lifecycle abstraction</td>
+          <td>kubelet directly</td>
+          <td>gRPC</td>
+          <td><span class="pill" style="background:rgba(124,58,237,.12);color:#c084fc;border-color:rgba(124,58,237,.3);">Stable</span></td>
+        </tr>
+        <tr>
+          <td class="td-csi">CSI</td>
+          <td>Container Storage Interface</td>
+          <td>Volume provisioning &amp; mounting</td>
+          <td>kubelet + external-provisioner</td>
+          <td>gRPC</td>
+          <td><span class="pill" style="background:rgba(13,148,136,.12);color:#2dd4bf;border-color:rgba(13,148,136,.3);">Stable</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Kubernetes</span> · CNI, CRI &amp; CSI Interfaces · <span>All three interfaces are CNCF-governed open standards</span>
+  </div>
+
+</div>
+</body>
+</html>

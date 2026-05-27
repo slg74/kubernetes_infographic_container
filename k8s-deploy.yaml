@@ -1,0 +1,60 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-infographics
+  namespace: default
+  labels:
+    app: k8s-infographics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: k8s-infographics
+  template:
+    metadata:
+      labels:
+        app: k8s-infographics
+    spec:
+      containers:
+        - name: nginx
+          image: k8s-infographics:latest
+          imagePullPolicy: Never        # image loaded via: kind load docker-image --name desktop
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-infographics
+  namespace: default
+  labels:
+    app: k8s-infographics
+spec:
+  type: LoadBalancer
+  selector:
+    app: k8s-infographics
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
