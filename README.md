@@ -1,5 +1,7 @@
 # Kubernetes Infographics
 
+![Kubernetes Infographics](k8s1.png)
+
 Visual reference guides for core Kubernetes concepts, served as static HTML pages from an nginx container running in a local Kubernetes cluster.
 
 ## Infographics
