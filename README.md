@@ -60,14 +60,6 @@ kubectl --context docker-desktop apply -f k8s-deploy.yaml
 kubectl --context docker-desktop rollout status deployment/k8s-infographics
 ```
 
-### 5. Forward a local port
-
-The cluster's LoadBalancer IP isn't assigned by default (the Envoy-based cloud provider requires additional setup), so use `port-forward` to reach the service:
-
-```bash
-kubectl --context docker-desktop port-forward service/k8s-infographics 8080:80
-```
-
 Open **http://localhost:8080** in your browser.
 
 ## Updating the infographics
@@ -172,3 +164,5 @@ aws ec2 delete-security-group --region us-east-1 --group-id <sg-id>
 ## Why `imagePullPolicy: Never`?
 
 The manifest sets `imagePullPolicy: Never` because the image is loaded directly into the kind node rather than pushed to a registry. If you push the image to a registry (Docker Hub, GHCR, etc.) and update the `image:` field accordingly, change this to `IfNotPresent`.
+
+The service type is `LoadBalancer` for compatibility with real clusters (e.g. EC2). Locally with kind, `run.sh` uses `port-forward` with an auto-restart loop to keep the connection stable.
